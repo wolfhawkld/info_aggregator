@@ -1,0 +1,77 @@
+# Azure OpenAI 配置示例
+# 适用于公司部署在Azure上的GPT模型
+
+# LLM配置 - Azure OpenAI
+llm:
+  provider: "azure"
+
+  # Azure OpenAI密钥
+  api_key: "${AZURE_OPENAI_KEY}"  # 建议从环境变量读取
+  # 或直接填写: api_key: "your-azure-api-key-here"
+
+  # 模型配置
+  model: "gpt-51"  # 替换为你的deployment名称（注意：这里是deployment名称，不是模型名称）
+
+  # Azure endpoint地址
+  base_url: "https://your-resource-name.openai.azure.com/"
+
+  # API版本
+  api_version: "2024-02-15-preview"  # 或使用最新版本
+
+  # 生成参数
+  temperature: 0.3
+  max_tokens: 2000
+
+# RSS源配置
+rss:
+  feeds_file: "config/rss_feeds.txt"
+  fetch_limit: 10  # 每个源最多抓取的文章数
+  days_back: 1     # 抓取最近N天的文章
+  timeout: 30
+
+# 输出配置
+output:
+  format: "markdown"
+  directory: "output/summaries"
+  filename_template: "ai_digest_{date}.md"
+  language: "zh"  # zh: 中文, en: 英文
+
+# 总结配置
+summary:
+  group_by_category: true  # 92个源建议开启分类
+  include_original_link: true
+  summary_style: "concise"  # concise: 简洁, detailed: 详细
+  highlight_keywords:
+    - "大模型"
+    - "Transformer"
+    - "强化学习"
+    - "多模态"
+    - "Agent"
+    - "推理"
+    - "训练技巧"
+
+# 调度配置
+schedule:
+  enabled: false
+  time: "09:00"
+  timezone: "Asia/Shanghai"
+
+# Azure配置说明：
+#
+# 1. 获取配置信息：
+#    - 登录Azure Portal: https://portal.azure.com
+#    - 找到你的OpenAI资源
+#    - 在"Keys and Endpoint"中找到：
+#      * API Key (api_key)
+#      * Endpoint URL (base_url)
+#    - 在"Model deployments"中找到你的deployment名称 (model)
+#
+# 2. Deployment名称示例：
+#    如果你在Azure中部署的名称是 "gpt-51" 或 "gpt-5-company"
+#    那么model参数就填这个deployment名称
+#
+# 3. 环境变量配置（推荐）：
+#    export AZURE_OPENAI_KEY="your-key-here"
+#
+# 4. 测试连接：
+#    python tools/test_llm.py --config config/config.azure.yaml

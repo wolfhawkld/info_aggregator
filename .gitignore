@@ -1,0 +1,13 @@
+config/config.yaml
+config/*.yaml
+!config/*.example.yaml
+.env
+.env.*
+.venv
+.venv.*
+*.log
+output/
+__pycache__/
+*.pyc
+.vscode/
+.idea/
