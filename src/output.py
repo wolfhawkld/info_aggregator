@@ -145,3 +145,110 @@ class OutputManager:
         print("\n" + "="*80)
         print(f"共 {len(articles)} 篇文章")
         print("="*80 + "\n")
+
+    def save_exploration(self, summary: str, exploration_data: Dict,
+                        explorer_config: Dict) -> str:
+        """
+        保存探索结果到文件
+
+        Args:
+            summary: LLM生成的总结
+            exploration_data: 探索数据字典
+            explorer_config: 探索器配置
+
+        Returns:
+            保存的文件路径
+        """
+        topic = exploration_data['topic']
+        date = datetime.now().strftime('%Y-%m-%d')
+
+        output_dir = explorer_config.get('output_directory', 'output/explorations')
+        os.makedirs(output_dir, exist_ok=True)
+
+        safe_topic = topic.replace(' ', '_').replace('/', '_')[:50]
+        filename_template = explorer_config.get('filename_template', 'explore_{topic}_{date}.md')
+        filename = filename_template.replace('{topic}', safe_topic).replace('{date}', date)
+        filepath = os.path.join(output_dir, filename)
+
+        content = self._format_exploration_markdown(summary, exploration_data)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        return filepath
+
+    def _format_exploration_markdown(self, summary: str, exploration_data: Dict) -> str:
+        """生成探索结果的Markdown格式"""
+        topic = exploration_data['topic']
+        search_date = exploration_data['search_date']
+        time_range = exploration_data['time_range']
+        total_results = exploration_data['total_results']
+        results = exploration_data['results']
+
+        content = f"""# 探索主题: {topic}
+
+> **生成时间**: {search_date}
+> **搜索时间范围**: {time_range}
+> **找到结果数**: {total_results} 个
+> **来源**: arXiv ({exploration_data['arxiv_count']}), Google Scholar ({exploration_data['scholar_count']})
+
+---
+
+## 🎯 AI智能总结
+
+{summary}
+
+---
+
+## 📄 详细论文列表
+
+"""
+
+        arxiv_results = [r for r in results if r['source'] == 'arXiv']
+        scholar_results = [r for r in results if r['source'] == 'Google Scholar']
+
+        if arxiv_results:
+            content += f"\n### arXiv 论文 ({len(arxiv_results)}篇)\n\n"
+            if 'arxiv_url' in exploration_data and exploration_data['arxiv_url']:
+                content += f"🔗 [在 arXiv 网站查看完整搜索结果]({exploration_data['arxiv_url']})\n\n"
+            for i, paper in enumerate(arxiv_results, 1):
+                authors = ', '.join(paper['authors'][:3])
+                if len(paper['authors']) > 3:
+                    authors += ' et al.'
+
+                content += f"#### {i}. {paper['title']}\n\n"
+                content += f"- **作者**: {authors}\n"
+                content += f"- **发布日期**: {paper['published']}\n"
+                content += f"- **分类**: {', '.join(paper.get('categories', []))}\n"
+                content += f"- **论文链接**: [{paper['link']}]({paper['link']})\n"
+                content += f"- **PDF链接**: [{paper['pdf_url']}]({paper['pdf_url']})\n"
+                content += f"\n**摘要**: {paper['summary']}\n\n"
+                content += "---\n\n"
+
+        if scholar_results:
+            content += f"\n### Google Scholar 论文 ({len(scholar_results)}篇)\n\n"
+            for i, paper in enumerate(scholar_results, 1):
+                if isinstance(paper['authors'], list):
+                    authors = ', '.join(paper['authors'][:3])
+                    if len(paper['authors']) > 3:
+                        authors += ' et al.'
+                else:
+                    authors = str(paper['authors'])
+
+                content += f"#### {i}. {paper['title']}\n\n"
+                content += f"- **作者**: {authors}\n"
+                content += f"- **发布时间**: {paper['published']}\n"
+                content += f"- **引用数**: {paper.get('citations', 'N/A')}\n"
+                content += f"- **链接**: [{paper['link']}]({paper['link']})\n"
+                content += f"\n**摘要**: {paper['summary']}\n\n"
+                content += "---\n\n"
+
+        content += f"""
+
+---
+
+*由RSS聚合助手探索功能自动生成 | Powered by LLM*
+*主题: {topic} | 生成于 {search_date}*
+"""
+
+        return content

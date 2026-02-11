@@ -7,6 +7,9 @@ from typing import List, Dict, Optional
 import time
 from bs4 import BeautifulSoup
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RSSFetcher:
@@ -25,8 +28,12 @@ class RSSFetcher:
         """
         加载RSS源列表
         支持格式: URL [分类标签]
+        只加载分类标签不是"未分类"的源
         """
         feeds = []
+        skipped_count = 0
+        total_count = 0
+
         try:
             with open(feeds_file, 'r', encoding='utf-8') as f:
                 for line in f:
@@ -34,16 +41,33 @@ class RSSFetcher:
                     if not line or line.startswith('#'):
                         continue
 
+                    total_count += 1
                     parts = line.split('[')
                     url = parts[0].strip()
                     category = parts[1].strip(']').strip() if len(parts) > 1 else '未分类'
 
-                    feeds.append({
-                        'url': url,
-                        'category': category
-                    })
+                    # 只添加分类不是"未分类"的源
+                    if category != '未分类':
+                        feeds.append({
+                            'url': url,
+                            'category': category
+                        })
+                        logger.debug(f"加载RSS源: {url} - 分类: {category}")
+                    else:
+                        skipped_count += 1
+                        logger.debug(f"跳过未分类RSS源: {url}")
+
+            message = f"RSS源加载完成: 总共 {total_count} 个源, 已加载 {len(feeds)} 个已分类源, 跳过 {skipped_count} 个未分类源"
+            print(message)
+            logger.info(message)
+
+            if len(feeds) == 0:
+                logger.warning("警告: 没有加载任何RSS源，请检查是否有已分类的源")
+
         except FileNotFoundError:
-            print(f"警告: RSS源文件 {feeds_file} 不存在")
+            error_msg = f"RSS源文件 {feeds_file} 不存在"
+            print(f"警告: {error_msg}")
+            logger.error(error_msg)
 
         return feeds
 

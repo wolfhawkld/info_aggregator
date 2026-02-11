@@ -214,3 +214,101 @@ Format: Use Markdown headings, lists, and links."""
             summaries[category] = summary
 
         return summaries
+
+    def summarize_exploration(self, exploration_data: Dict,
+                            summary_config: Dict,
+                            language: str = 'zh') -> str:
+        """
+        总结探索结果（学术论文和技术内容）
+        """
+        if exploration_data['total_results'] == 0:
+            return "未找到相关内容。"
+
+        topic = exploration_data['topic']
+        results = exploration_data['results']
+
+        formatted = []
+        for i, item in enumerate(results, 1):
+            authors_str = ', '.join(item['authors'][:3]) if isinstance(item['authors'], list) else str(item['authors'])
+            if len(item['authors']) > 3:
+                authors_str += ' et al.'
+
+            text = f"""
+论文 {i}:
+标题: {item['title']}
+作者: {authors_str}
+来源: {item['source']}
+发布日期: {item['published']}
+链接: {item['link']}
+摘要: {item['summary'][:800]}
+"""
+            formatted.append(text.strip())
+
+        articles_text = "\n\n---\n\n".join(formatted)
+
+        if language == 'zh':
+            system_prompt = f"""你是一位专业的学术研究分析师。你的任务是阅读关于"{topic}"主题的最新学术论文和技术文章，并生成一份高质量的分析报告。
+
+要求：
+1. 概括该领域的最新研究趋势和技术进展
+2. 识别出最有价值和最具创新性的研究
+3. 分析不同研究之间的关联和差异
+4. 突出实际应用价值和未来研究方向
+5. 保持客观、准确、专业的写作风格
+6. 必须包含原文链接，方便深入阅读"""
+
+            user_prompt = f"""请阅读以下关于"{topic}"的最新研究论文，并生成一份分析报告。
+
+论文内容：
+{articles_text}
+
+请生成一份Markdown格式的分析报告，包括：
+1. 研究趋势概述（总体方向和热点）
+2. 重点论文分析（3-5篇最重要的论文，每篇2-3句话）
+3. 技术创新点总结
+4. 实际应用价值
+5. 推荐阅读（按重要性排序）
+
+格式要求：使用Markdown标题、列表和链接。"""
+        else:
+            system_prompt = f"""You are a professional academic research analyst. Your task is to read the latest academic papers and technical articles about "{topic}" and generate a high-quality analysis report.
+
+Requirements:
+1. Summarize the latest research trends and technical advances
+2. Identify the most valuable and innovative research
+3. Analyze connections and differences between studies
+4. Highlight practical applications and future research directions
+5. Maintain objective, accurate, and professional writing style
+6. Include original links for deep reading"""
+
+            user_prompt = f"""Please read the following research papers about "{topic}" and generate an analysis report.
+
+Papers:
+{articles_text}
+
+Please generate a Markdown-formatted analysis report including:
+1. Research Trends Overview (overall direction and hot topics)
+2. Key Papers Analysis (3-5 most important papers, 2-3 sentences each)
+3. Technical Innovation Summary
+4. Practical Application Value
+5. Recommended Reading (sorted by importance)
+
+Format: Use Markdown headings, lists, and links."""
+
+        print(f"\n正在使用 {self.provider} ({self.model}) 生成探索总结...")
+
+        try:
+            if self.provider in ['openai', 'azure', 'ollama']:
+                summary = self._call_openai(user_prompt, system_prompt)
+            elif self.provider == 'anthropic':
+                summary = self._call_anthropic(user_prompt, system_prompt)
+            else:
+                summary = "错误: 不支持的LLM提供商"
+
+            print("✓ 探索总结生成完成")
+            return summary
+
+        except Exception as e:
+            error_msg = f"LLM调用失败: {str(e)}"
+            print(f"✗ {error_msg}")
+            return error_msg
