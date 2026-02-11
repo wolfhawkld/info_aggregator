@@ -174,11 +174,15 @@ def run_explorer(config: dict, topics: list):
     print(f"探索主题: {', '.join(topics)}\n")
 
     explorer_config = config.get('explorer', {})
-    logging.info(f"初始化内容探索器 - 时间范围: {explorer_config.get('months_back', 1)}个月")
+    enable_scholar = explorer_config.get('enable_scholar', True)
+    logging.info(f"初始化内容探索器 - 时间范围: {explorer_config.get('months_back', 1)}个月, Scholar: {'启用' if enable_scholar else '禁用'}")
     explorer = ContentExplorer(
         months_back=explorer_config.get('months_back', 1),
         results_limit=explorer_config.get('results_limit', 10),
-        cert_path=explorer_config.get('cert_path')
+        cert_path=explorer_config.get('cert_path'),
+        scholar_retry=explorer_config.get('scholar_retry', 3),
+        scholar_delay_range=explorer_config.get('scholar_delay_range', [5, 10]),
+        enable_scholar=enable_scholar
     )
 
     for topic in topics:
