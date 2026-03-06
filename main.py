@@ -244,20 +244,28 @@ def run_daily_task(config: dict):
     工作流程：
     1. 检查当天内容是否已存在
     2. 如不存在，执行RSS抓取和探索
-    3. 生成一句话摘要并发送邮件
+    3. 生成HTML版本文件
+    4. 生成一句话摘要并发送邮件（包含web链接）
     """
     daily_config = config.get('daily', {})
     topics = daily_config.get('topics', [])
-    output_base = daily_config.get('output_directory', 'resource/daily')
+    web_config = daily_config.get('web', {})
+
+    # 使用web目录作为输出路径
+    output_base = web_config.get('output_base_path', 'resource/daily')
+    base_url = web_config.get('base_url', '')
 
     date_str = datetime.now().strftime('%Y-%m-%d')
     output_dir = os.path.join(output_base, date_str)
+    web_url = f"{base_url}/{date_str}" if base_url else ""
 
     print("=" * 80)
     print("每日任务模式 - 一键执行全量任务")
     print("=" * 80)
     print(f"当前日期: {date_str}")
     print(f"输出目录: {output_dir}")
+    if web_url:
+        print(f"访问URL: {web_url}")
 
     # 检查当天内容是否已存在
     existing_results = _check_existing_daily_content(output_dir, topics)
@@ -275,8 +283,11 @@ def run_daily_task(config: dict):
 
         results = _execute_daily_tasks(config, output_dir, date_str, topics)
 
-    # 生成一句话摘要并发送邮件
-    _send_daily_email(config, output_dir, date_str, results)
+    # 生成HTML版本文件
+    _generate_html_files(output_dir, results, date_str)
+
+    # 生成一句话摘要并发送邮件（包含web链接）
+    _send_daily_email(config, output_dir, date_str, results, web_url)
 
 
 def _check_existing_daily_content(output_dir: str, topics: list) -> dict:
@@ -476,7 +487,7 @@ def _execute_daily_tasks(config: dict, output_dir: str, date_str: str, topics: l
     return results
 
 
-def _send_daily_email(config: dict, output_dir: str, date_str: str, results: dict):
+def _send_daily_email(config: dict, output_dir: str, date_str: str, results: dict, web_url: str = ""):
     """生成一句话摘要并发送邮件"""
     email_config = config.get('email', {})
     if not email_config.get('enabled', False):
@@ -508,7 +519,8 @@ def _send_daily_email(config: dict, output_dir: str, date_str: str, results: dic
 
         stats = {
             'rss_articles': results['rss']['article_count'] if results['rss'] else 0,
-            'exploration_count': len(results['explorations'])
+            'exploration_count': len(results['explorations']),
+            'web_url': web_url
         }
 
         success = notifier.send_daily_summary(brief_summary, recipient, date_str, stats)
@@ -591,17 +603,17 @@ def _generate_daily_index(index_file: str, date_str: str, results: dict):
 
 ---
 
-## 目录
+## 快速导航
 
 """
 
     if results['rss']:
-        content += f"1. [RSS信息摘要](#rss信息摘要)\n"
+        content += f"- [RSS信息摘要](rss_summary.html) ({results['rss']['article_count']} 篇文章)\n"
 
     if results['explorations']:
-        for i, exp in enumerate(results['explorations'], 2):
+        for exp in results['explorations']:
             safe_topic = exp['topic'].replace(' ', '_').replace('/', '_')[:50]
-            content += f"{i}. [探索: {exp['topic']}](#探索-{safe_topic.lower()})\n"
+            content += f"- [探索: {exp['topic']}](explore_{safe_topic}.html) ({exp['result_count']} 篇论文)\n"
 
     content += "\n---\n\n"
 
@@ -609,7 +621,7 @@ def _generate_daily_index(index_file: str, date_str: str, results: dict):
         content += f"""## RSS信息摘要
 
 - 文章数量: {results['rss']['article_count']}
-- 文件链接: [rss_summary.md](rss_summary.md)
+- 详细内容: [rss_summary.html](rss_summary.html)
 
 ---
 
@@ -622,7 +634,7 @@ def _generate_daily_index(index_file: str, date_str: str, results: dict):
             content += f"""### 探索: {exp['topic']}
 
 - 找到结果: {exp['result_count']} 篇
-- 文件链接: [explore_{safe_topic}.md](explore_{safe_topic}.md)
+- 详细内容: [explore_{safe_topic}.html](explore_{safe_topic}.html)
 
 """
 
@@ -633,6 +645,243 @@ def _generate_daily_index(index_file: str, date_str: str, results: dict):
 
     with open(index_file, 'w', encoding='utf-8') as f:
         f.write(content)
+
+
+def _generate_html_files(output_dir: str, results: dict, date_str: str):
+    """为所有markdown文件生成对应的HTML版本，方便浏览器直接查看"""
+    print("\n" + "=" * 80)
+    print("生成HTML版本文件")
+    print("=" * 80)
+    logging.info("开始生成HTML文件...")
+
+    html_files = []
+
+    # 生成索引页HTML
+    index_md = os.path.join(output_dir, '00_index.md')
+    if os.path.exists(index_md):
+        index_html = os.path.join(output_dir, 'index.html')
+        _convert_md_to_html(index_md, index_html, f"每日信息汇总 - {date_str}")
+        html_files.append(('index.html', '汇总索引'))
+        print(f"  ✓ index.html")
+        logging.info(f"生成HTML: index.html")
+
+    # 生成RSS摘要HTML
+    rss_md = os.path.join(output_dir, 'rss_summary.md')
+    if os.path.exists(rss_md):
+        rss_html = os.path.join(output_dir, 'rss_summary.html')
+        _convert_md_to_html(rss_md, rss_html, f"RSS信息摘要 - {date_str}")
+        html_files.append(('rss_summary.html', 'RSS摘要'))
+        print(f"  ✓ rss_summary.html")
+        logging.info(f"生成HTML: rss_summary.html")
+
+    # 生成各探索主题HTML
+    for exp in results.get('explorations', []):
+        safe_topic = exp['topic'].replace(' ', '_').replace('/', '_')[:50]
+        explore_md = os.path.join(output_dir, f'explore_{safe_topic}.md')
+        if os.path.exists(explore_md):
+            explore_html = os.path.join(output_dir, f'explore_{safe_topic}.html')
+            _convert_md_to_html(explore_md, explore_html, f"探索: {exp['topic']} - {date_str}")
+            html_files.append((f'explore_{safe_topic}.html', exp['topic']))
+            print(f"  ✓ explore_{safe_topic}.html")
+            logging.info(f"生成HTML: explore_{safe_topic}.html")
+
+    print(f"\n✓ 共生成 {len(html_files)} 个HTML文件")
+    logging.info(f"HTML文件生成完成，共 {len(html_files)} 个")
+
+
+def _convert_md_to_html(md_file: str, html_file: str, title: str):
+    """将Markdown文件转换为HTML"""
+    import re
+
+    with open(md_file, 'r', encoding='utf-8') as f:
+        md_content = f.read()
+
+    # 简单的Markdown到HTML转换
+    html_content = _markdown_to_html(md_content)
+
+    # 完整HTML页面
+    full_html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+            background: #fff;
+        }}
+        h1, h2, h3, h4, h5, h6 {{
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }}
+        h1 {{ font-size: 2em; border-bottom: 1px solid #eee; padding-bottom: .3em; }}
+        h2 {{ font-size: 1.5em; border-bottom: 1px solid #eee; padding-bottom: .3em; }}
+        h3 {{ font-size: 1.25em; }}
+        a {{ color: #0366d6; text-decoration: none; }}
+        a:hover {{ text-decoration: underline; }}
+        code {{
+            padding: .2em .4em;
+            margin: 0;
+            font-size: 85%;
+            background-color: rgba(27,31,35,.05);
+            border-radius: 3px;
+        }}
+        pre {{
+            padding: 16px;
+            overflow: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            background-color: #f6f8fa;
+            border-radius: 6px;
+        }}
+        blockquote {{
+            padding: 0 1em;
+            color: #6a737d;
+            border-left: .25em solid #dfe2e5;
+            margin: 0 0 16px 0;
+        }}
+        table {{
+            border-spacing: 0;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }}
+        table th, table td {{
+            padding: 6px 13px;
+            border: 1px solid #dfe2e5;
+        }}
+        table th {{
+            font-weight: 600;
+            background: #f6f8fa;
+        }}
+        table tr:nth-child(2n) {{
+            background: #f6f8fa;
+        }}
+        hr {{
+            height: .25em;
+            padding: 0;
+            margin: 24px 0;
+            background-color: #e1e4e8;
+            border: 0;
+        }}
+        ul, ol {{
+            padding-left: 2em;
+            margin-bottom: 16px;
+        }}
+        li {{
+            margin-bottom: .25em;
+        }}
+        .nav {{
+            background: #f6f8fa;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }}
+        .nav a {{
+            margin-right: 15px;
+        }}
+    </style>
+</head>
+<body>
+    <div class="nav">
+        <a href="index.html">返回索引</a>
+        <a href="rss_summary.html">RSS摘要</a>
+    </div>
+    <article>
+{html_content}
+    </article>
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px;">
+        由 RSS聚合助手 自动生成 - {date_str}
+    </footer>
+</body>
+</html>"""
+
+    with open(html_file, 'w', encoding='utf-8') as f:
+        f.write(full_html)
+
+
+def _markdown_to_html(md: str) -> str:
+    """简单的Markdown到HTML转换（不依赖外部库）"""
+    import re
+
+    html = md
+
+    # 转义HTML特殊字符（但保留我们需要的格式）
+    # html = html.replace('&', '&amp;')
+
+    # 代码块
+    html = re.sub(r'```(\w*)\n(.*?)```', r'<pre><code class="\1">\2</code></pre>', html, flags=re.DOTALL)
+    html = re.sub(r'`([^`]+)`', r'<code>\1</code>', html)
+
+    # 标题
+    html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
+    html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
+    html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
+
+    # 粗体和斜体
+    html = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', html)
+    html = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', html)
+    html = re.sub(r'\*(.+?)\*', r'<em>\1</em>', html)
+
+    # 链接
+    html = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', html)
+
+    # 引用
+    html = re.sub(r'^> (.+)$', r'<blockquote>\1</blockquote>', html, flags=re.MULTILINE)
+
+    # 水平线
+    html = re.sub(r'^---$', r'<hr>', html, flags=re.MULTILINE)
+
+    # 无序列表
+    def convert_ul(match):
+        items = match.group(0)
+        items = re.sub(r'^[-•] (.+)$', r'<li>\1</li>', items, flags=re.MULTILINE)
+        return f'<ul>\n{items}\n</ul>'
+
+    html = re.sub(r'(^[-•] .+\n?)+', convert_ul, html, flags=re.MULTILINE)
+
+    # 有序列表
+    def convert_ol(match):
+        items = match.group(0)
+        items = re.sub(r'^\d+\. (.+)$', r'<li>\1</li>', items, flags=re.MULTILINE)
+        return f'<ol>\n{items}\n</ol>'
+
+    html = re.sub(r'(^\d+\. .+\n?)+', convert_ol, html, flags=re.MULTILINE)
+
+    # 段落（连续的非标签行）
+    lines = html.split('\n')
+    result = []
+    in_paragraph = False
+    paragraph_content = []
+
+    for line in lines:
+        stripped = line.strip()
+        # 检查是否是块级元素
+        is_block = (stripped.startswith('<') or
+                    stripped.startswith('---') or
+                    stripped == '')
+
+        if is_block:
+            if in_paragraph:
+                result.append('<p>' + ' '.join(paragraph_content) + '</p>')
+                paragraph_content = []
+                in_paragraph = False
+            result.append(line)
+        else:
+            in_paragraph = True
+            paragraph_content.append(stripped)
+
+    if in_paragraph:
+        result.append('<p>' + ' '.join(paragraph_content) + '</p>')
+
+    return '\n'.join(result)
 
 
 def schedule_job(config: dict):

@@ -114,6 +114,8 @@ class EmailNotifier:
         stats: Dict
     ) -> str:
         """构建纯文本邮件内容"""
+        web_url = stats.get('web_url', '')
+
         content = f"""每日AI研究摘要 - {date_str}
 
 {brief_summary}
@@ -123,8 +125,13 @@ class EmailNotifier:
 - RSS文章数: {stats.get('rss_articles', 0)}
 - 探索主题数: {stats.get('exploration_count', 0)}
 
-此邮件由RSS聚合助手自动生成
 """
+        if web_url:
+            content += f"""详细内容链接:
+{web_url}/index.html
+
+"""
+        content += "此邮件由RSS聚合助手自动生成"
         return content
 
     def _build_html_content(
@@ -136,6 +143,22 @@ class EmailNotifier:
         """构建HTML邮件内容"""
         # 将 markdown bullet points 转换为 HTML 列表
         summary_html = self._format_summary_to_html(brief_summary)
+        web_url = stats.get('web_url', '')
+
+        # 构建链接区域
+        link_section = ""
+        if web_url:
+            link_section = f"""
+    <div class="link-section" style="background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 20px 0; text-align: center;">
+        <p style="margin: 0 0 10px 0; font-weight: bold; color: #0078d4;">查看详细内容</p>
+        <a href="{web_url}/index.html" style="display: inline-block; background: #0078d4; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+            点击查看每日汇总
+        </a>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
+            包含RSS摘要及5个主题探索的完整内容
+        </p>
+    </div>
+"""
 
         html = f"""<!DOCTYPE html>
 <html>
@@ -158,6 +181,8 @@ class EmailNotifier:
     <div class="summary">
         {summary_html}
     </div>
+
+    {link_section}
 
     <div class="stats">
         <p><strong>统计信息:</strong></p>
