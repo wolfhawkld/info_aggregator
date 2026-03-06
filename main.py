@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 #!/usr/bin/env python3
 """
 RSS聚合助手 - 主程序
@@ -18,6 +19,7 @@ from fetcher import RSSFetcher
 from summarizer import LLMSummarizer
 from output import OutputManager
 from explorer import ContentExplorer
+from notifier import EmailNotifier
 
 
 def setup_logging(log_level: str = 'INFO'):
@@ -235,6 +237,404 @@ def run_explorer(config: dict, topics: list):
     print(f"\n结束时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 
+def run_daily_task(config: dict):
+    """
+    运行每日全量任务
+
+    工作流程：
+    1. 检查当天内容是否已存在
+    2. 如不存在，执行RSS抓取和探索
+    3. 生成一句话摘要并发送邮件
+    """
+    daily_config = config.get('daily', {})
+    topics = daily_config.get('topics', [])
+    output_base = daily_config.get('output_directory', 'resource/daily')
+
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    output_dir = os.path.join(output_base, date_str)
+
+    print("=" * 80)
+    print("每日任务模式 - 一键执行全量任务")
+    print("=" * 80)
+    print(f"当前日期: {date_str}")
+    print(f"输出目录: {output_dir}")
+
+    # 检查当天内容是否已存在
+    existing_results = _check_existing_daily_content(output_dir, topics)
+
+    if existing_results:
+        print("\n✓ 检测到今日内容已存在，跳过抓取步骤")
+        logging.info("今日内容已存在，跳过抓取")
+        results = existing_results
+    else:
+        # 执行抓取和探索
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"探索主题: {', '.join(topics)}\n")
+        logging.info(f"每日任务启动 - 输出目录: {output_dir}, 主题数: {len(topics)}")
+
+        results = _execute_daily_tasks(config, output_dir, date_str, topics)
+
+    # 生成一句话摘要并发送邮件
+    _send_daily_email(config, output_dir, date_str, results)
+
+
+def _check_existing_daily_content(output_dir: str, topics: list) -> dict:
+    """
+    检查当天内容是否已存在
+
+    Returns:
+        如果存在返回results字典，否则返回None
+    """
+    if not os.path.exists(output_dir):
+        return None
+
+    results = {
+        'rss': None,
+        'explorations': []
+    }
+
+    # 检查RSS摘要
+    rss_file = os.path.join(output_dir, 'rss_summary.md')
+    if os.path.exists(rss_file):
+        # 读取文件估算文章数
+        with open(rss_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+            article_count = content.count('- 来源:')
+        results['rss'] = {
+            'file': rss_file,
+            'article_count': article_count
+        }
+
+    # 检查探索结果
+    for topic in topics:
+        safe_topic = topic.replace(' ', '_').replace('/', '_')[:50]
+        explore_file = os.path.join(output_dir, f'explore_{safe_topic}.md')
+        if os.path.exists(explore_file):
+            results['explorations'].append({
+                'topic': topic,
+                'file': explore_file,
+                'result_count': 0  # 精确数不重要，文件存在即可
+            })
+
+    # 如果没有任何内容，返回None
+    if not results['rss'] and not results['explorations']:
+        return None
+
+    return results
+
+
+def _execute_daily_tasks(config: dict, output_dir: str, date_str: str, topics: list) -> dict:
+    """执行每日抓取和探索任务"""
+    results = {
+        'rss': None,
+        'explorations': []
+    }
+
+    # 1. RSS抓取和总结
+    print("\n" + "=" * 80)
+    print("步骤 1/2: RSS信息抓取和总结")
+    print("=" * 80)
+    logging.info("开始RSS抓取...")
+
+    try:
+        fetcher = RSSFetcher(
+            timeout=config['rss']['timeout'],
+            days_back=config['rss']['days_back'],
+            fetch_limit=config['rss']['fetch_limit']
+        )
+        feeds = fetcher.load_feeds(config['rss']['feeds_file'])
+        logging.info(f"加载了 {len(feeds)} 个RSS源")
+
+        if feeds:
+            articles = fetcher.fetch_all(feeds)
+            logging.info(f"抓取完成：共 {len(articles)} 篇文章")
+
+            if articles:
+                summarizer = LLMSummarizer(config['llm'])
+
+                if len(articles) > 50 and config['summary'].get('group_by_category', False):
+                    summaries = summarizer.summarize_by_category(
+                        articles,
+                        config['summary'],
+                        config['output']['language']
+                    )
+                    summary = "\n\n".join([
+                        f"## {category}\n\n{text}"
+                        for category, text in summaries.items()
+                    ])
+                else:
+                    summary = summarizer.summarize_articles(
+                        articles,
+                        config['summary'],
+                        config['output']['language']
+                    )
+
+                # 保存到每日目录
+                rss_file = os.path.join(output_dir, 'rss_summary.md')
+                output_manager = OutputManager(config['output'])
+                content = output_manager._format_markdown(summary, articles, date_str)
+                with open(rss_file, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+                results['rss'] = {
+                    'file': rss_file,
+                    'article_count': len(articles)
+                }
+                print(f"✓ RSS总结已保存: {rss_file}")
+                logging.info(f"RSS总结已保存: {rss_file}")
+            else:
+                print("⚠️  没有抓取到新文章")
+                logging.warning("RSS抓取: 没有新文章")
+        else:
+            print("⚠️  没有找到已分类的RSS源")
+            logging.warning("RSS: 没有已分类的源")
+    except Exception as e:
+        print(f"✗ RSS抓取失败: {str(e)}")
+        logging.error(f"RSS抓取失败: {str(e)}", exc_info=True)
+
+    # 2. 主题探索
+    print("\n" + "=" * 80)
+    print(f"步骤 2/2: 学术论文探索 ({len(topics)} 个主题)")
+    print("=" * 80)
+    logging.info(f"开始探索 {len(topics)} 个主题...")
+
+    explorer_config = config.get('explorer', {})
+    enable_scholar = explorer_config.get('enable_scholar', True)
+
+    explorer = ContentExplorer(
+        months_back=explorer_config.get('months_back', 1),
+        results_limit=explorer_config.get('results_limit', 10),
+        cert_path=explorer_config.get('cert_path'),
+        scholar_retry=explorer_config.get('scholar_retry', 3),
+        scholar_delay_range=explorer_config.get('scholar_delay_range', [5, 10]),
+        enable_scholar=enable_scholar
+    )
+
+    summarizer = LLMSummarizer(config['llm'])
+    output_manager = OutputManager(config['output'])
+
+    for i, topic in enumerate(topics, 1):
+        print(f"\n[{i}/{len(topics)}] 探索主题: {topic}")
+        logging.info(f"[{i}/{len(topics)}] 开始探索: {topic}")
+
+        try:
+            exploration_data = explorer.explore_topic(topic)
+
+            if exploration_data['total_results'] == 0:
+                print(f"  ⚠️  未找到相关内容")
+                logging.warning(f"探索 '{topic}': 未找到结果")
+                continue
+
+            print(f"  ✓ 找到 {exploration_data['total_results']} 个结果")
+            logging.info(f"探索 '{topic}': {exploration_data['total_results']} 个结果")
+
+            summary = summarizer.summarize_exploration(
+                exploration_data,
+                config['summary'],
+                config['output']['language']
+            )
+
+            # 保存到每日目录
+            safe_topic = topic.replace(' ', '_').replace('/', '_')[:50]
+            explore_file = os.path.join(output_dir, f'explore_{safe_topic}.md')
+            content = output_manager._format_exploration_markdown(summary, exploration_data)
+            with open(explore_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+
+            results['explorations'].append({
+                'topic': topic,
+                'file': explore_file,
+                'result_count': exploration_data['total_results']
+            })
+            print(f"  ✓ 已保存: {explore_file}")
+            logging.info(f"探索 '{topic}' 已保存: {explore_file}")
+
+        except Exception as e:
+            print(f"  ✗ 探索失败: {str(e)}")
+            logging.error(f"探索 '{topic}' 失败: {str(e)}", exc_info=True)
+
+    # 3. 生成汇总索引文件
+    index_file = os.path.join(output_dir, '00_index.md')
+    _generate_daily_index(index_file, date_str, results)
+    print(f"\n✓ 汇总索引已生成: {index_file}")
+    logging.info(f"汇总索引已生成: {index_file}")
+
+    # 4. 输出总结
+    print("\n" + "=" * 80)
+    print("每日任务完成")
+    print("=" * 80)
+    print(f"结束时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"输出目录: {output_dir}")
+
+    if results['rss']:
+        print(f"  RSS总结: {results['rss']['article_count']} 篇文章")
+    print(f"  主题探索: {len(results['explorations'])} 个主题完成")
+
+    logging.info(f"每日任务完成 - RSS: {results['rss'] is not None}, 探索: {len(results['explorations'])}/{len(topics)}")
+
+    return results
+
+
+def _send_daily_email(config: dict, output_dir: str, date_str: str, results: dict):
+    """生成一句话摘要并发送邮件"""
+    email_config = config.get('email', {})
+    if not email_config.get('enabled', False):
+        print("\n邮件功能未启用，跳过发送")
+        return
+
+    print("\n" + "=" * 80)
+    print("生成精简摘要并发送邮件")
+    print("=" * 80)
+    logging.info("开始生成精简摘要...")
+
+    try:
+        # 收集所有内容用于生成摘要
+        all_content = _collect_daily_content(output_dir, results)
+
+        if not all_content:
+            print("  ⚠️  没有内容可生成摘要")
+            logging.warning("没有内容可生成摘要")
+            return
+
+        # 调用LLM生成一句话摘要
+        brief_summary = _generate_brief_summary(config, all_content, date_str)
+        print(f"  ✓ 精简摘要已生成")
+        logging.info(f"精简摘要已生成: {brief_summary[:100]}...")
+
+        # 发送邮件
+        notifier = EmailNotifier(email_config)
+        recipient = email_config.get('recipient', 'damon.long@merckgroup.com')
+
+        stats = {
+            'rss_articles': results['rss']['article_count'] if results['rss'] else 0,
+            'exploration_count': len(results['explorations'])
+        }
+
+        success = notifier.send_daily_summary(brief_summary, recipient, date_str, stats)
+
+        if success:
+            print(f"  ✓ 邮件已发送至: {recipient}")
+            logging.info(f"邮件发送成功: {recipient}")
+        else:
+            print(f"  ✗ 邮件发送失败，请检查日志")
+
+    except Exception as e:
+        print(f"  ✗ 邮件发送流程失败: {str(e)}")
+        logging.error(f"邮件发送流程失败: {str(e)}", exc_info=True)
+
+
+def _collect_daily_content(output_dir: str, results: dict) -> str:
+    """收集每日任务的所有内容"""
+    content_parts = []
+
+    # 收集RSS摘要
+    if results['rss']:
+        rss_file = os.path.join(output_dir, 'rss_summary.md')
+        if os.path.exists(rss_file):
+            with open(rss_file, 'r', encoding='utf-8') as f:
+                rss_content = f.read()
+                # 只取摘要部分，不要完整文章列表
+                if '## 📚 完整文章列表' in rss_content:
+                    rss_content = rss_content.split('## 📚 完整文章列表')[0]
+                content_parts.append(f"=== RSS摘要 ===\n{rss_content}")
+
+    # 收集探索结果
+    for exp in results['explorations']:
+        if os.path.exists(exp['file']):
+            with open(exp['file'], 'r', encoding='utf-8') as f:
+                exp_content = f.read()
+                # 只取AI总结部分
+                if '## 📄 详细论文列表' in exp_content:
+                    exp_content = exp_content.split('## 📄 详细论文列表')[0]
+                content_parts.append(f"=== 探索: {exp['topic']} ===\n{exp_content}")
+
+    return "\n\n".join(content_parts)
+
+
+def _generate_brief_summary(config: dict, all_content: str, date_str: str) -> str:
+    """调用LLM生成bullet points格式的精简摘要"""
+    summarizer = LLMSummarizer(config['llm'])
+
+    prompt = f"""基于以下今日收集的所有AI研究内容，生成一个简洁的每日摘要。
+
+要求：
+1. 使用bullet points格式（每项以"• "开头）
+2. 每个bullet point概括一个重要研究方向或发现
+3. 每个bullet point控制在20-30字以内
+4. 列出3-5个最重要的要点
+5. 不要列举具体论文标题，而是概括研究趋势
+
+内容：
+{all_content[:8000]}
+
+请直接输出bullet points，不要有其他说明文字。示例格式：
+• Agent领域研究热点转向多智能体协作与任务规划
+• RAG技术聚焦于检索效率优化与上下文长度扩展
+• 多模态模型在视觉理解任务上取得显著进展"""
+
+    summary = summarizer.client.chat.completions.create(
+        model=config['llm']['model'],
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+        max_tokens=500
+    )
+
+    return summary.choices[0].message.content.strip()
+
+
+def _generate_daily_index(index_file: str, date_str: str, results: dict):
+    """生成每日任务汇总索引文件"""
+    content = f"""# 每日信息汇总 - {date_str}
+
+> 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+---
+
+## 目录
+
+"""
+
+    if results['rss']:
+        content += f"1. [RSS信息摘要](#rss信息摘要)\n"
+
+    if results['explorations']:
+        for i, exp in enumerate(results['explorations'], 2):
+            safe_topic = exp['topic'].replace(' ', '_').replace('/', '_')[:50]
+            content += f"{i}. [探索: {exp['topic']}](#探索-{safe_topic.lower()})\n"
+
+    content += "\n---\n\n"
+
+    if results['rss']:
+        content += f"""## RSS信息摘要
+
+- 文章数量: {results['rss']['article_count']}
+- 文件链接: [rss_summary.md](rss_summary.md)
+
+---
+
+"""
+
+    if results['explorations']:
+        content += "## 学术论文探索\n\n"
+        for exp in results['explorations']:
+            safe_topic = exp['topic'].replace(' ', '_').replace('/', '_')[:50]
+            content += f"""### 探索: {exp['topic']}
+
+- 找到结果: {exp['result_count']} 篇
+- 文件链接: [explore_{safe_topic}.md](explore_{safe_topic}.md)
+
+"""
+
+    content += """---
+
+*由RSS聚合助手每日任务自动生成*
+"""
+
+    with open(index_file, 'w', encoding='utf-8') as f:
+        f.write(content)
+
+
 def schedule_job(config: dict):
     """定时任务模式"""
     import schedule
@@ -299,6 +699,11 @@ def main():
         type=int,
         help='探索模式每个主题的结果数量限制'
     )
+    parser.add_argument(
+        '--daily',
+        action='store_true',
+        help='执行每日全量任务（RSS抓取 + 主题探索）'
+    )
 
     args = parser.parse_args()
 
@@ -331,7 +736,10 @@ def main():
         logging.info(f"命令行参数覆盖: explore_limit={args.explore_limit}")
 
     # 运行模式选择
-    if args.explore:
+    if args.daily:
+        logging.info("运行模式: 每日任务")
+        run_daily_task(config)
+    elif args.explore:
         logging.info(f"运行模式: 内容探索 - 主题: {args.explore}")
         run_explorer(config, args.explore)
     elif args.schedule or config['schedule'].get('enabled', False):

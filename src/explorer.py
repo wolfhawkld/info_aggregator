@@ -204,20 +204,20 @@ class ContentExplorer:
                 captcha_detected = False
 
                 for pub in search_query:
-                    if count >= limit * 2:
-                        logger.info(f"达到最大迭代次数 {limit * 2}，停止搜索")
+                    if count >= limit * 3:  # 增加迭代次数以应对跳过的结果
+                        logger.info(f"达到最大迭代次数 {limit * 3}，停止搜索")
                         break
 
                     try:
                         # 记录原始数据结构
-                        logger.debug(f"处理第 {count+1} 个结果")
+                        logger.info(f"📄 处理第 {count+1} 个Scholar结果")
                         logger.debug(f"pub keys: {pub.keys()}")
 
                         title = pub.get('bib', {}).get('title', 'N/A')
                         pub_year = pub.get('bib', {}).get('pub_year')
 
-                        logger.debug(f"论文标题: {title}")
-                        logger.debug(f"发表年份: {pub_year}")
+                        logger.info(f"  标题: {title}")
+                        logger.info(f"  年份: {pub_year}")
 
                         # Scholar不做时间过滤，因为只有年份信息不够精确
                         # Google Scholar通常只返回最近和相关的论文，无需额外过滤
@@ -235,10 +235,10 @@ class ContentExplorer:
 
                         results.append(paper_data)
                         processed += 1
-                        logger.info(f"✓ 添加论文: {title[:80]}... (年份: {pub_year})")
+                        logger.info(f"  ✓ 已添加到结果 (当前已收集 {len(results)}/{limit} 篇)")
 
                         if len(results) >= limit:
-                            logger.info(f"已收集足够结果 ({limit} 篇)，停止搜索")
+                            logger.info(f"✅ 已收集足够结果 ({limit} 篇)，停止搜索")
                             break
 
                     except Exception as e:
@@ -248,7 +248,8 @@ class ContentExplorer:
                             logger.warning(f"⚠️  检测到限流信号: {e}")
                             captcha_detected = True
                             break
-                        logger.warning(f"处理Scholar结果时出错: {e}", exc_info=True)
+                        logger.error(f"  ✗ 跳过此结果 - 解析失败: {e}")
+                        logger.debug(f"  原始数据: {pub}", exc_info=True)
                         continue
                     finally:
                         count += 1
@@ -268,7 +269,10 @@ class ContentExplorer:
                     continue  # 继续重试循环
 
                 # 成功完成搜索
-                logger.info(f"Scholar搜索 '{query}' 完成: 迭代 {count} 次, 收集 {len(results)} 篇")
+                skipped = count - len(results)
+                logger.info(f"Scholar搜索 '{query}' 完成: 迭代 {count} 次, 成功 {len(results)} 篇, 跳过 {skipped} 篇")
+                if skipped > 0:
+                    logger.warning(f"⚠️  有 {skipped} 个结果被跳过，可能是解析失败或数据不完整")
                 break  # 跳出重试循环
 
             except Exception as e:

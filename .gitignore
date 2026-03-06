@@ -54,3 +54,5 @@ config/config.yaml
 
 # Windows
 Thumbs.db
+env*sh*
+resource/daily
