@@ -13,20 +13,22 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# 检查虚拟环境
-if [ ! -d "venv" ]; then
+# 检查虚拟环境（优先使用 .venv）
+if [ -d ".venv" ]; then
+    source .venv/bin/activate
+elif [ -d "venv" ]; then
+    source venv/bin/activate
+else
     echo "首次运行，正在创建虚拟环境..."
-    python3 -m venv venv
+    python3 -m venv .venv
+    source .venv/bin/activate
 fi
 
-# 激活虚拟环境
-source venv/bin/activate
-
 # 安装/更新依赖
-if [ ! -f "venv/.deps_installed" ]; then
+if [ ! -f ".venv/.deps_installed" ]; then
     echo "正在安装依赖..."
     pip install -r requirements.txt
-    touch venv/.deps_installed
+    touch .venv/.deps_installed
 fi
 
 # 检查配置

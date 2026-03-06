@@ -699,6 +699,9 @@ def _convert_md_to_html(md_file: str, html_file: str, title: str):
     # 简单的Markdown到HTML转换
     html_content = _markdown_to_html(md_content)
 
+    # 获取当前日期
+    current_date = datetime.now().strftime('%Y-%m-%d')
+
     # 完整HTML页面
     full_html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
@@ -798,7 +801,7 @@ def _convert_md_to_html(md_file: str, html_file: str, title: str):
 {html_content}
     </article>
     <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px;">
-        由 RSS聚合助手 自动生成 - {date_str}
+        由 RSS聚合助手 自动生成 - {current_date}
     </footer>
 </body>
 </html>"""
