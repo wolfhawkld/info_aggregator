@@ -57,3 +57,4 @@ config/config.yaml
 Thumbs.db
 resource/daily
 *.ini
+uploads
