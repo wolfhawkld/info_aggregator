@@ -48,7 +48,7 @@ def load_config(config_file: str = 'config/config.yaml') -> dict:
     return config
 
 
-def run_aggregator(config: dict, dry_run: bool = False, test_mode: bool = False):
+def run_aggregator(config: dict, dry_run: bool = False, test_mode: bool = False, region: str = None):
     """
     运行RSS聚合流程
 
@@ -56,11 +56,15 @@ def run_aggregator(config: dict, dry_run: bool = False, test_mode: bool = False)
         config: 配置字典
         dry_run: 仅抓取不总结
         test_mode: 测试模式（限制源数量）
+        region: 区域过滤，'cn' 表示国内站点
     """
     print("="*80)
     print("RSS AI聚合助手")
     print("="*80)
-    print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    print(f"开始时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    if region:
+        print(f"区域过滤: {'国内站点' if region == 'cn' else '国际站点'}")
+    print()
 
     # 1. 初始化抓取器
     fetcher = RSSFetcher(
@@ -70,8 +74,8 @@ def run_aggregator(config: dict, dry_run: bool = False, test_mode: bool = False)
     )
 
     # 2. 加载RSS源
-    feeds = fetcher.load_feeds(config['rss']['feeds_file'])
-    logging.info(f"加载了 {len(feeds)} 个RSS源")
+    feeds = fetcher.load_feeds(config['rss']['feeds_file'], region=region)
+    logging.info(f"加载了 {len(feeds)} 个RSS源" + (f" (区域: {region})" if region else ""))
 
     if not feeds:
         print("错误: 没有找到任何RSS源，请检查配置文件")
@@ -956,6 +960,11 @@ def main():
         action='store_true',
         help='执行每日全量任务（RSS抓取 + 主题探索）'
     )
+    parser.add_argument(
+        '--region',
+        choices=['cn', 'global'],
+        help='区域过滤：cn=国内站点, global=国际站点'
+    )
 
     args = parser.parse_args()
 
@@ -998,8 +1007,8 @@ def main():
         logging.info("运行模式: 定时任务")
         schedule_job(config)
     else:
-        logging.info(f"运行模式: RSS聚合 (dry_run={args.dry_run}, test={args.test})")
-        run_aggregator(config, dry_run=args.dry_run, test_mode=args.test)
+        logging.info(f"运行模式: RSS聚合 (dry_run={args.dry_run}, test={args.test}, region={args.region})")
+        run_aggregator(config, dry_run=args.dry_run, test_mode=args.test, region=args.region)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,257 @@
+meta:
+  description: RSS订阅源配置
+  last_updated: '2026-03-10'
+  field_descriptions:
+    priority: 1-5 (5最高)，影响抓取和呈现优先级
+    frequency: 更新频率，可用于调整抓取策略
+    status: enabled/disabled/pending，控制是否抓取
+feeds:
+- url: http://arxiv.org/rss/cs.MA
+  category: 多智能体协作
+  name: arXiv cs.MA (多智能体系统)
+  priority: 5
+  frequency: 每日
+  note: 多智能体顶级论文源
+  status: enabled
+- url: https://www.microsoft.com/en-us/research/feed/
+  category: 多智能体协作
+  name: Microsoft Research AI
+  priority: 5
+  frequency: 每周
+  note: 微软AI研究前沿
+  status: enabled
+- url: https://multiagents.org/feed
+  category: 多智能体协作
+  name: AAAI WMAC 2026
+  priority: 4
+  frequency: 会议期间
+  note: AAAI 2026多智能体专题
+  status: pending
+- url: https://machinelearningmastery.com/feed/
+  category: 多智能体协作
+  name: Machine Learning Mastery
+  priority: 4
+  frequency: 每周2-3次
+  note: 包含7种Agent设计模式
+  status: enabled
+- url: https://www.ifaamas.org/feed
+  category: 多智能体协作
+  name: AAMAS会议
+  priority: 4
+  frequency: 会议期间
+  note: 多智能体系统顶会
+  status: pending
+- url: http://statmodeling.stat.columbia.edu/feed/
+  category: 因果推理
+  name: Andrew Gelman因果推理博客
+  priority: 5
+  frequency: 每日
+  note: 因果推理领域权威
+  status: enabled
+- url: https://www.inference.vc/rss
+  category: 因果推理
+  name: inFERENCe by Ferenc Huszár
+  priority: 5
+  frequency: 每周1-2次
+  note: 深度学习+因果推理
+  status: enabled
+- url: https://blog.ml.cmu.edu/feed/
+  category: 因果推理
+  name: CMU Machine Learning Blog
+  priority: 5
+  frequency: 每周
+  note: 卡内基梅隆ML博客
+  status: enabled
+- url: http://arxiv.org/rss/cs.AI
+  category: 因果推理
+  name: arXiv因果推理专题
+  priority: 4
+  frequency: 每日
+  note: 需手动筛选关键词
+  status: pending
+- url: https://mem0.ai/blog/feed
+  category: AI记忆系统
+  name: Mem0 Research Blog
+  priority: 4
+  frequency: 每月
+  note: 26%准确率提升研究
+  status: pending
+- url: https://unite.ai/feed
+  category: AI记忆系统
+  name: Unite.AI
+  priority: 3
+  frequency: 每日
+  note: 综合AI新闻
+  status: enabled
+- url: https://dev.to/feed/tag/ai
+  category: 语义聚类
+  name: DEV Community - AI/ML
+  priority: 3
+  frequency: 每日
+  note: 实践型社区
+  status: enabled
+- url: https://paperswithcode.com/feed
+  category: 语义聚类
+  name: Papers With Code
+  priority: 5
+  frequency: 每日
+  note: 论文+代码
+  status: enabled
+- url: https://denser.ai/blog/feed
+  category: 语义聚类
+  name: Denser.AI Blog
+  priority: 3
+  frequency: 每周
+  note: 语义搜索专业博客
+  status: pending
+- url: https://ai.googleblog.com/feeds/posts/default
+  category: 综合AI前沿
+  name: Google AI Blog
+  priority: 5
+  frequency: 每周2-3次
+  note: Google官方AI博客
+  status: enabled
+- url: https://ai.facebook.com/blog/rss/
+  category: 综合AI前沿
+  name: Meta AI Research
+  priority: 5
+  frequency: 每周2-3次
+  note: Meta官方研究
+  status: enabled
+- url: https://www.marktechpost.com/feed
+  category: 综合AI前沿
+  name: MarkTechPost
+  priority: 5
+  frequency: 每日
+  note: ML研究热点
+  status: enabled
+- url: https://openai.com/blog/rss/
+  category: 综合AI前沿
+  name: OpenAI Research
+  priority: 5
+  frequency: 每周
+  note: OpenAI官方
+  status: enabled
+- url: https://www.anthropic.com/rss.xml
+  category: 综合AI前沿
+  name: Anthropic Research
+  priority: 4
+  frequency: 每周
+  note: Anthropic官方
+  status: enabled
+- url: https://hnrss.org/newest
+  category: 综合AI前沿
+  name: Hacker News (技术)
+  priority: 4
+  frequency: 实时
+  note: HN技术社区
+  status: enabled
+- url: https://blog.bytebytego.com/feed
+  category: 综合AI前沿
+  name: ByteByteGo
+  priority: 3
+  frequency: 每周
+  note: 系统设计博客
+  status: enabled
+- url: https://www.qbitai.com/feed
+  category: 中文资源
+  name: 量子位 QbitAI
+  priority: 5
+  frequency: 每日
+  note: 中文AI资讯权威
+  region: cn
+  status: enabled
+- url: https://36kr.com/feed
+  category: 中文资源
+  name: 36氪
+  priority: 4
+  frequency: 每日
+  note: 中文AI产业趋势（全站RSS）
+  region: cn
+  status: enabled
+- url: https://www.baai.ac.cn/feed
+  category: 中文资源
+  name: 智源研究院BAAI
+  priority: 4
+  frequency: 每周
+  note: 中国AI研究院
+  region: cn
+  status: enabled
+- url: https://tech.meituan.com/feed
+  category: 中文资源
+  name: 美团技术团队
+  priority: 3
+  frequency: 每周
+  note: 大厂技术博客
+  region: cn
+  status: enabled
+- url: https://neurips.cc/feed
+  category: 学术会议
+  name: NeurIPS官方
+  priority: 4
+  frequency: 年度
+  note: 机器学习顶会
+  status: pending
+- url: https://icml.cc/feed
+  category: 学术会议
+  name: ICML官方
+  priority: 4
+  frequency: 年度
+  note: 机器学习顶会
+  status: pending
+- url: https://iclr.cc/feed
+  category: 学术会议
+  name: ICLR官方
+  priority: 4
+  frequency: 年度
+  note: 深度学习顶会
+  status: pending
+- url: https://hnrss.org/newest?q=multi-agent+OR+causal
+  category: 工具定制
+  name: HN RSS (关键词定制)
+  priority: 5
+  frequency: 实时
+  note: 可按关键词定制
+  status: enabled
+- url: https://simonwillison.net/atom/everything/
+  category: AI, data journalism, blogging
+  name: simonwillison.net
+  priority: 3
+  frequency: 未知
+  status: enabled
+- url: https://krebsonsecurity.com/feed/
+  category: security, malware, fraud
+  name: krebsonsecurity.com
+  priority: 3
+  frequency: 未知
+  status: enabled
+- url: https://garymarcus.substack.com/feed
+  category: AI, cognitive science, technology
+  name: garymarcus.substack.com
+  priority: 3
+  frequency: 未知
+  status: enabled
+- url: https://www.wheresyoured.at/rss/
+  category: tech industry, AI, media criticism
+  name: wheresyoured.at
+  priority: 3
+  frequency: 未知
+  status: enabled
+- url: https://geohot.github.io/blog/feed.xml
+  category: technology, hacking, AI
+  name: geohot.github.io
+  priority: 3
+  frequency: 未知
+  status: enabled
+- url: http://www.aaronsw.com/2002/feeds/pgessays.rss
+  category: startups, technology, entrepreneurship
+  name: paulgraham.com
+  priority: 3
+  frequency: 未知
+  status: enabled
+- url: https://refactoringenglish.com/index.xml
+  category: linux, debugging, dns
+  name: refactoringenglish.com
+  priority: 3
+  frequency: 未知
+  status: enabled
