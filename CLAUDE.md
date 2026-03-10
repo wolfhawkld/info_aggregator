@@ -1,9 +1,9 @@
 # RSS聚合器项目 - 长期开发记忆
 
-> **最后更新**: 2026-03-03
-> **当前版本**: v1.2.0
-> **代码规模**: 1600+行核心代码（5个核心模块 + 主程序）
-> **状态**: 功能完整，生产可用，支持每日任务一键执行，邮件通知
+> **最后更新**: 2026-03-06
+> **当前版本**: v1.3.0
+> **代码规模**: 2000+行核心代码（5个核心模块 + 主程序）
+> **状态**: 生产可用，支持定时任务、Web输出、邮件通知
 
 ---
 
@@ -92,16 +92,16 @@ RSS源列表 → RSSFetcher(抓取) → LLMSummarizer(总结) → OutputManager(
 
 ---
 
-## ⚙️ 当前配置（2026-02-10）
+## ⚙️ 当前配置（2026-03-10）
 
 ### LLM配置
 ```yaml
-provider: azure
-model: gpt-51
-base_url: https://api.nlp.dev.uptimize.merckgroup.com
-api_version: 2025-11-13
+provider: openai                    # OpenAI兼容接口
+model: glm-5                        # 阿里云百炼 GLM-5
+base_url: https://coding.dashscope.aliyuncs.com/v1
 temperature: 0.3
 max_tokens: 8000
+# API Key 从环境变量或配置文件读取，此处不记录
 ```
 
 ### RSS配置
@@ -1422,6 +1422,118 @@ python main.py --daily
 - 多收件人支持分号/逗号分隔
 - bullet points 自动转换为 HTML 列表
 - 支持阿里云百炼 OpenAI 兼容 API
+
+---
+
+### 版本 v1.3.0 - 2026-03-06
+
+#### Web 输出与定时任务部署
+
+**背景**：用户需要将每日任务部署到服务器，通过 crontab 定时执行，并通过 Web 访问结果。
+
+**核心改进**：
+
+**1. Web 目录输出**
+
+新增配置项，支持将每日内容直接输出到 Nginx 静态目录：
+```yaml
+daily:
+  web:
+    output_base_path: "/www/wwwroot/ai4sci.com/uploads"
+    base_url: "https://124.223.34.173/uploads"
+```
+
+输出目录结构：
+```
+/www/wwwroot/ai4sci.com/uploads/
+└── 2026-03-06/
+    ├── index.html           # HTML 索引（浏览器入口）
+    ├── rss_summary.html     # RSS 摘要 HTML
+    ├── explore_agentic_ai.html
+    └── ...                  # 其他探索主题 HTML
+```
+
+**2. HTML 文件自动生成**
+
+- 新增 `_generate_html_files()` 函数
+- 新增 `_convert_md_to_html()` Markdown 转 HTML（不依赖外部库）
+- 新增 `_markdown_to_html()` 简易 Markdown 解析器
+- 支持：标题、列表、链接、代码块、引用、表格等
+
+**3. 邮件通知增强**
+
+邮件中新增醒目的 Web 链接按钮：
+```html
+<div class="link-section">
+    <a href="https://124.223.34.173/uploads/2026-03-06/index.html">
+        点击查看每日汇总
+    </a>
+</div>
+```
+
+**4. 定时任务启动脚本**
+
+新增 `start_daily.sh`，专为 crontab 设计：
+```bash
+#!/bin/bash
+# 自动激活 venv
+source .venv/bin/activate
+# 记录日志
+python main.py --daily >> logs/daily_$(date +%Y%m%d).log 2>&1
+```
+
+Crontab 配置：
+```bash
+# 每天北京时间 8:00 执行
+0 8 * * * /path/to/info_aggregator/start_daily.sh
+```
+
+**5. Scholar 开关优化**
+
+服务器环境无法访问 Google Scholar 时可关闭：
+```yaml
+explorer:
+  enable_scholar: false  # 关闭后仅使用 arXiv
+```
+
+**修改文件**：
+
+| 文件 | 修改内容 |
+|------|---------|
+| `main.py` | 新增 `_generate_html_files()`、`_convert_md_to_html()`、`_markdown_to_html()`；修改 `run_daily_task()` 支持 Web 输出 |
+| `src/notifier.py` | 邮件内容新增 Web 链接按钮 |
+| `config/config.yaml` | 新增 `daily.web` 配置块 |
+| `start_daily.sh` | 新增 crontab 专用启动脚本 |
+| `run.sh` | 更新支持 `.venv` 目录 |
+
+**技术要点**：
+
+- Markdown 转 HTML 不依赖外部库（如 markdown、mistune）
+- HTML 页面内置 GitHub 风格 CSS 样式
+- 导航栏支持返回索引页
+- 自动检测今日内容避免重复执行
+
+**使用示例**：
+
+```bash
+# 手动执行每日任务
+python main.py --daily
+
+# 查看输出
+# Web: https://124.223.34.173/uploads/2026-03-06/index.html
+
+# 查看日志
+cat logs/daily_20260306.log
+```
+
+**部署检查清单**：
+
+| 检查项 | 说明 |
+|--------|------|
+| Nginx 目录权限 | `chmod 755 /www/wwwroot/ai4sci.com/uploads` |
+| Python 环境 | `.venv` 虚拟环境 |
+| Crontab 配置 | `0 8 * * * /path/to/start_daily.sh` |
+| Scholar 开关 | 服务器环境建议关闭 |
 
 ---
 
