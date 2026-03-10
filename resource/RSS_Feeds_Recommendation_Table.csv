@@ -1,0 +1,32 @@
+﻿类别,RSS源名称,RSS地址,更新频率,推荐优先级,备注
+多智能体协作,arXiv cs.MA (多智能体系统),http://arxiv.org/rss/cs.MA,每日,★★★★★,多智能体顶级论文源
+多智能体协作,Microsoft Research AI,https://www.microsoft.com/en-us/research/feed/,每周,★★★★★,微软AI研究前沿
+多智能体协作,AAAI WMAC 2026,https://multiagents.org/feed (需查证),会议期间,★★★★,AAAI 2026多智能体专题
+多智能体协作,Machine Learning Mastery,https://machinelearningmastery.com/feed/,每周2-3次,★★★★,包含7种Agent设计模式
+多智能体协作,AAMAS会议,https://www.ifaamas.org/feed (需查证),会议期间,★★★★,多智能体系统顶会
+因果推理,Andrew Gelman因果推理博客,http://statmodeling.stat.columbia.edu/feed/,每日,★★★★★,因果推理领域权威
+因果推理,inFERENCe by Ferenc Huszár,https://www.inference.vc/rss,每周1-2次,★★★★★,深度学习+因果推理
+因果推理,CMU Machine Learning Blog,https://blog.ml.cmu.edu/feed/,每周,★★★★★,卡内基梅隆ML博客
+因果推理,arXiv因果推理专题,http://arxiv.org/rss/cs.AI (搜索causal inference),每日,★★★★,需手动筛选关键词
+AI记忆系统,Mem0 Research Blog,https://mem0.ai/blog/feed (需查证),每月,★★★★,26%准确率提升研究
+AI记忆系统,arXiv AI记忆系统,http://arxiv.org/rss/cs.AI (搜索AI memory),每日,★★★★,需手动筛选关键词
+AI记忆系统,Unite.AI,https://unite.ai/feed,每日,★★★,综合AI新闻
+语义聚类,DEV Community - AI/ML,https://dev.to/feed/tag/ai,每日,★★★,实践型社区
+语义聚类,Papers With Code,https://paperswithcode.com/feed,每日,★★★★★,论文+代码
+语义聚类,Denser.AI Blog,https://denser.ai/blog/feed (需查证),每周,★★★,语义搜索专业博客
+综合AI前沿,Google AI Blog,https://ai.googleblog.com/feeds/posts/default,每周2-3次,★★★★★,Google官方AI博客
+综合AI前沿,Meta AI Research,https://ai.facebook.com/blog/rss/,每周2-3次,★★★★★,Meta官方研究
+综合AI前沿,MarkTechPost,https://www.marktechpost.com/feed,每日,★★★★★,ML研究热点
+综合AI前沿,OpenAI Research,https://openai.com/blog/rss/,每周,★★★★★,OpenAI官方
+综合AI前沿,Anthropic Research,https://www.anthropic.com/rss.xml,每周,★★★★,Anthropic官方
+综合AI前沿,Hacker News (技术),https://hnrss.org/newest,实时,★★★★,HN技术社区
+综合AI前沿,ByteByteGo,https://blog.bytebytego.com/feed,每周,★★★,系统设计博客
+中文资源,量子位 QbitAI,https://www.qbitai.com/feed (需查证),每日,★★★★★,中文AI资讯权威
+中文资源,36氪 AI频道,https://36kr.com/feed/ai (需查证),每日,★★★★,中文AI产业趋势
+中文资源,智源研究院BAAI,https://www.baai.ac.cn/feed (需查证),每周,★★★★,中国AI研究院
+中文资源,美团技术团队,https://tech.meituan.com/feed (需查证),每周,★★★,大厂技术博客
+学术会议,NeurIPS官方,https://neurips.cc/feed (需查证),年度,★★★★,机器学习顶会
+学术会议,ICML官方,https://icml.cc/feed (需查证),年度,★★★★,机器学习顶会
+学术会议,ICLR官方,https://iclr.cc/feed (需查证),年度,★★★★,深度学习顶会
+工具定制,HN RSS (关键词定制),https://hnrss.org/newest?q=multi-agent+OR+causal,实时,★★★★★,可按关键词定制
+工具定制,arXiv关键词订阅,http://arxiv.org/rss/cs.AI (自定义关键词),每日,★★★★★,支持多种学科分类

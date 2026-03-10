@@ -29,6 +29,7 @@ wheels/
 .env
 .env.local
 env_*.sh
+env*sh*
 
 # 输出文件
 output/
@@ -54,5 +55,5 @@ config/config.yaml
 
 # Windows
 Thumbs.db
-env*sh*
 resource/daily
+*.ini
