@@ -6,7 +6,7 @@ meta:
     frequency: 更新频率，可用于调整抓取策略
     status: enabled/disabled/pending，控制是否抓取
 feeds:
-- url: http://arxiv.org/rss/cs.MA
+- url: https://arxiv.org/rss/cs.MA
   category: 多智能体协作
   name: arXiv cs.MA (多智能体系统)
   priority: 5
@@ -46,8 +46,8 @@ feeds:
   name: Andrew Gelman因果推理博客
   priority: 5
   frequency: 每日
-  note: 因果推理领域权威
-  status: enabled
+  note: 因果推理领域权威 (DNS超时，暂时禁用)
+  status: disabled
 - url: https://www.inference.vc/rss
   category: 因果推理
   name: inFERENCe by Ferenc Huszár
@@ -62,7 +62,7 @@ feeds:
   frequency: 每周
   note: 卡内基梅隆ML博客
   status: enabled
-- url: http://arxiv.org/rss/cs.AI
+- url: https://arxiv.org/rss/cs.AI
   category: 因果推理
   name: arXiv因果推理专题
   priority: 4
