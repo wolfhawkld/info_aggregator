@@ -4,7 +4,9 @@
 """
 
 import os
+import re
 import smtplib
+from html import escape
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
@@ -13,6 +15,9 @@ from typing import Dict, List
 import logging
 
 logger = logging.getLogger(__name__)
+
+# 匹配有序列表前缀，如 "1. "、"12. "
+_ORDERED_LIST_RE = re.compile(r'^\d+\.\s+(.*)$')
 
 
 class EmailNotifier:
@@ -201,28 +206,45 @@ class EmailNotifier:
         return html
 
     def _format_summary_to_html(self, summary: str) -> str:
-        """将 markdown bullet points 转换为 HTML 列表"""
+        """将 markdown 要点转换为 HTML 列表。
+
+        支持 -、• 以及 1. 2. 等有序列表前缀，统一渲染为无序列表，
+        避免 LLM 把所有项都标为 1 导致邮件里序号错乱。
+        """
+        if not summary or not summary.strip():
+            return '<p>（无摘要内容）</p>'
+
         lines = summary.strip().split('\n')
         html_lines = []
         in_list = False
 
+        def close_list():
+            nonlocal in_list
+            if in_list:
+                html_lines.append('</ul>')
+                in_list = False
+
         for line in lines:
             stripped = line.strip()
-            # 检测 bullet point（支持 - 和 •）
+            if not stripped:
+                continue  # 空行不中断列表
+
+            content = None
             if stripped.startswith('- ') or stripped.startswith('• '):
+                content = stripped[2:]
+            else:
+                m = _ORDERED_LIST_RE.match(stripped)
+                if m:
+                    content = m.group(1)
+
+            if content is not None:
                 if not in_list:
                     html_lines.append('<ul>')
                     in_list = True
-                content = stripped[2:] if stripped.startswith('- ') else stripped[2:]
-                html_lines.append(f'<li>{content}</li>')
+                html_lines.append(f'<li>{escape(content)}</li>')
             else:
-                if in_list:
-                    html_lines.append('</ul>')
-                    in_list = False
-                if stripped:
-                    html_lines.append(f'<p>{stripped}</p>')
+                close_list()
+                html_lines.append(f'<p>{escape(stripped)}</p>')
 
-        if in_list:
-            html_lines.append('</ul>')
-
+        close_list()
         return '\n'.join(html_lines)

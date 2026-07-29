@@ -4,7 +4,7 @@ import requests
 from requests.exceptions import Timeout, ConnectionError, RequestException
 from datetime import datetime, timedelta
 from dateutil import parser as date_parser
-from typing import List, Dict, Optional
+from typing import List, Dict
 import time
 from bs4 import BeautifulSoup
 import re
@@ -173,21 +173,33 @@ class RSSFetcher:
 
         return text[:1000]  # 限制长度
 
-    def is_recent(self, entry_date: Optional[str], days_back: int) -> bool:
-        """判断文章是否在指定天数内"""
+    def is_recent(self, entry_date, days_back: int) -> bool:
+        """判断文章是否在指定天数内。
+
+        日期缺失或解析失败时返回 False（排除），避免无日期/无法解析的旧文章
+        反复进入每日摘要。带时区的日期会统一转换为本地 naive 时间再比较，
+        避免 tz-aware 与 datetime.now() 比较抛 TypeError 被静默吞掉。
+        """
         if not entry_date:
-            return True  # 如果没有日期，默认包含
+            logger.debug("文章无发布日期，按非近期处理跳过")
+            return False
 
         try:
             if isinstance(entry_date, str):
                 pub_date = date_parser.parse(entry_date)
             else:
+                # feedparser 的 *_parsed 是 struct_time/tuple
                 pub_date = datetime(*entry_date[:6])
+
+            # 统一为本地 naive 时间，避免 tz-aware 与 datetime.now() 比较报错
+            if pub_date.tzinfo is not None:
+                pub_date = pub_date.astimezone().replace(tzinfo=None)
 
             cutoff_date = datetime.now() - timedelta(days=days_back)
             return pub_date >= cutoff_date
-        except:
-            return True  # 解析失败，默认包含
+        except Exception as e:
+            logger.warning(f"文章日期解析失败，已跳过: {entry_date!r} ({e})")
+            return False
 
     def fetch_feed(self, feed_url: str, category: str) -> List[Dict]:
         """
@@ -220,14 +232,17 @@ class RSSFetcher:
                 if count >= self.fetch_limit:
                     break
 
-                # 检查发布时间
-                pub_date = entry.get('published', entry.get('updated', ''))
+                # 检查发布时间（优先用 feedparser 已解析的结构化时间，更稳健）
+                pub_date = entry.get('published_parsed') or entry.get('updated_parsed')
+                if not pub_date:
+                    pub_date = entry.get('published', entry.get('updated', ''))
                 if not self.is_recent(pub_date, self.days_back):
                     continue
 
                 # 提取内容
                 title = entry.get('title', '无标题')
                 link = entry.get('link', '')
+                guid = entry.get('id', '') or link  # RSS GUID，去重优先用
 
                 # 获取描述/摘要
                 description = entry.get('summary', entry.get('description', ''))
@@ -239,6 +254,7 @@ class RSSFetcher:
                 articles.append({
                     'title': title,
                     'link': link,
+                    'guid': guid,
                     'content': content,
                     'author': author,
                     'published': pub_date,

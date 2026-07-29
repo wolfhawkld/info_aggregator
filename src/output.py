@@ -1,8 +1,49 @@
 """输出模块"""
 import os
+import re
 from datetime import datetime
 from typing import List, Dict
 import json
+
+# 匹配有序列表行，如 "1. 内容"、"  2. 内容"
+_ORDERED_LINE_RE = re.compile(r'^(\s*)(\d+)\.(\s+)(.*)$')
+
+
+def normalize_ordered_lists(text: str) -> str:
+    """修正 LLM 生成的有序列表序号。
+
+    常见问题：LLM 把每一项都标成 "1."（合法 markdown，但纯文本/部分邮件客户端
+    不会自动重新编号，导致全显示为 1）。此处将连续的有序列表项按 1,2,3... 重新编号，
+    并支持按缩进区分嵌套层级。
+    """
+    if not text:
+        return text
+
+    lines = text.split('\n')
+    out = []
+    counters = {}  # 缩进层级 -> 当前序号
+    last_level = -1
+
+    for line in lines:
+        m = _ORDERED_LINE_RE.match(line)
+        if m:
+            indent, _num, space, content = m.groups()
+            level = len(indent)
+            # 回到更浅层级时，清除更深层级的计数
+            if level < last_level:
+                for l in [l for l in counters if l > level]:
+                    del counters[l]
+            counters[level] = counters.get(level, 0) + 1
+            out.append(f"{indent}{counters[level]}.{space}{content}")
+            last_level = level
+        elif line.strip() == '':
+            out.append(line)  # 空行不重置计数，允许列表跨空行
+        else:
+            counters.clear()
+            last_level = -1
+            out.append(line)
+
+    return '\n'.join(out)
 
 
 class OutputManager:
@@ -44,6 +85,9 @@ class OutputManager:
 
     def _format_markdown(self, summary: str, articles: List[Dict], date: str) -> str:
         """生成Markdown格式"""
+        # 规整有序列表序号（避免LLM把所有项都标为1）
+        summary = normalize_ordered_lists(summary)
+
         content = f"""# AI每日摘要 - {date}
 
 > 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
@@ -179,6 +223,9 @@ class OutputManager:
 
     def _format_exploration_markdown(self, summary: str, exploration_data: Dict) -> str:
         """生成探索结果的Markdown格式"""
+        # 规整有序列表序号（避免LLM把所有项都标为1）
+        summary = normalize_ordered_lists(summary)
+
         topic = exploration_data['topic']
         search_date = exploration_data['search_date']
         time_range = exploration_data['time_range']

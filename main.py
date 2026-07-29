@@ -18,9 +18,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from fetcher import RSSFetcher
 from summarizer import LLMSummarizer
-from output import OutputManager
+from output import OutputManager, normalize_ordered_lists
 from explorer import ContentExplorer
 from notifier import EmailNotifier
+from dedup import ArticleDeduplicator
 
 
 def setup_logging(log_level: str = 'INFO'):
@@ -47,6 +48,44 @@ def load_config(config_file: str = 'config/config.yaml') -> dict:
     with open(config_file, 'r', encoding='utf-8') as f:
         config = yaml.safe_load(f)
     return config
+
+
+def _apply_dedup(config: dict, articles: list) -> tuple:
+    """对抓取到的文章应用历史去重。
+
+    Returns:
+        (去重后的文章列表, deduplicator实例或None)
+    """
+    dedup_config = config.get('dedup', {})
+    if not dedup_config.get('enabled', True):
+        return articles, None
+    deduper = ArticleDeduplicator(
+        store_path=dedup_config.get('store_file', 'data/seen_articles.json'),
+        retention_days=dedup_config.get('retention_days', 30)
+    )
+    return deduper.filter_new(articles), deduper
+
+
+def _mark_seen(config: dict, articles: list, deduper=None):
+    """总结成功后将文章标记为已见并持久化。deduper 为 None 时按需创建。"""
+    if not articles:
+        return
+    dedup_config = config.get('dedup', {})
+    if not dedup_config.get('enabled', True):
+        return
+    if deduper is None:
+        deduper = ArticleDeduplicator(
+            store_path=dedup_config.get('store_file', 'data/seen_articles.json'),
+            retention_days=dedup_config.get('retention_days', 30)
+        )
+    deduper.mark_seen(articles)
+
+
+def _summary_failed(summary: str) -> bool:
+    """判断LLM总结是否失败（summarizer内部捕获异常后返回的错误字符串）"""
+    if not summary:
+        return True
+    return summary.startswith('LLM调用失败') or summary.startswith('错误:')
 
 
 def run_aggregator(config: dict, dry_run: bool = False, test_mode: bool = False, region: str = None):
@@ -96,6 +135,13 @@ def run_aggregator(config: dict, dry_run: bool = False, test_mode: bool = False,
     if not articles:
         print("\n没有抓取到任何新文章")
         logging.warning("没有抓取到任何新文章")
+        return
+
+    # 历史去重：跳过已总结过的文章
+    articles, deduper = _apply_dedup(config, articles)
+    if not articles:
+        print("\n今日无新内容（所有文章均已在历史摘要中出现过）")
+        logging.info("去重后无新文章，跳过总结")
         return
 
     # 4. 显示统计信息
@@ -157,6 +203,10 @@ def run_aggregator(config: dict, dry_run: bool = False, test_mode: bool = False,
     # 保存到文件
     output_file = output_manager.save_summary(summary, articles)
     logging.info(f"摘要已保存到: {output_file}")
+
+    # 记录已总结的文章，供下次去重（总结失败则不记录，以便重试）
+    if deduper and not _summary_failed(summary):
+        _mark_seen(config, articles, deduper)
 
     # 同时在终端显示
     output_manager.print_summary(summary, articles)
@@ -376,6 +426,7 @@ def _execute_daily_tasks(config: dict, output_dir: str, date_str: str, topics: l
     logging.info("开始RSS抓取...")
 
     articles = []
+    deduper = None
     try:
         fetcher = RSSFetcher(
             timeout=config['rss']['timeout'],
@@ -389,13 +440,18 @@ def _execute_daily_tasks(config: dict, output_dir: str, date_str: str, topics: l
             articles = fetcher.fetch_all(feeds)
             logging.info(f"RSS抓取完成：共 {len(articles)} 篇文章")
 
-            # 立即保存原始数据
+            # 历史去重后保存原始数据
             if articles:
-                raw_file = os.path.join(output_dir, 'raw_articles.json')
-                with open(raw_file, 'w', encoding='utf-8') as f:
-                    json.dump(articles, f, ensure_ascii=False, indent=2)
-                print(f"✓ 原始文章已保存: {raw_file}")
-                logging.info(f"原始文章已保存: {raw_file}")
+                articles, deduper = _apply_dedup(config, articles)
+                if articles:
+                    raw_file = os.path.join(output_dir, 'raw_articles.json')
+                    with open(raw_file, 'w', encoding='utf-8') as f:
+                        json.dump(articles, f, ensure_ascii=False, indent=2)
+                    print(f"✓ 原始文章已保存: {raw_file}")
+                    logging.info(f"原始文章已保存: {raw_file}")
+                else:
+                    print("⚠️  RSS去重后无新文章")
+                    logging.info("RSS去重后无新文章")
         else:
             print("⚠️  没有找到已分类的RSS源")
             logging.warning("RSS: 没有已分类的源")
@@ -495,6 +551,9 @@ def _execute_daily_tasks(config: dict, output_dir: str, date_str: str, topics: l
                 'file': rss_file,
                 'article_count': len(articles)
             }
+            # 记录已总结的文章（总结失败则不记录，以便重试）
+            if not _summary_failed(summary):
+                _mark_seen(config, articles, deduper)
             print(f"✓ RSS总结已保存: {rss_file}")
             logging.info(f"RSS总结已保存: {rss_file}")
         except Exception as e:
@@ -611,6 +670,9 @@ def _run_llm_summarization(config: dict, output_dir: str, date_str: str, topics:
                 'file': rss_file,
                 'article_count': len(articles)
             }
+            # 记录已总结的文章（总结失败则不记录，以便重试）
+            if not _summary_failed(summary):
+                _mark_seen(config, articles)
             print(f"✓ RSS总结已保存: {rss_file}")
             logging.info(f"RSS总结已保存: {rss_file}")
         except Exception as e:
@@ -770,7 +832,8 @@ def _generate_brief_summary(config: dict, all_content: str, date_str: str) -> st
         max_tokens=500
     )
 
-    return summary.choices[0].message.content.strip()
+    # 规整有序列表序号（避免LLM把所有项都标为1）
+    return normalize_ordered_lists(summary.choices[0].message.content.strip())
 
 
 def _generate_daily_index(index_file: str, date_str: str, results: dict):
